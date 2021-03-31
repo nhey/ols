@@ -1,17 +1,18 @@
-include ../Makefile
-
+# May want to run `make lib` in ../.
 clean:
-	rm -f *.out *.out.c *_opencl.py
-	rm -rf __pycache__ lib
+	rm -f *.out *.out.c *_pyopencl.py
+	rm -rf __pycache__
 
 %.out: %.fut
 	futhark opencl -o $@ $<
 
-%: %.fut
-	futhark pyopencl --library -o $@_opencl $<
+%_pyopencl: %.fut
+	futhark pyopencl --library -o $@ $<
 
-test-fut: lib ols_test.out
-	echo 2 | ./ols_test.out
+test-fut:
+	futhark test ols_test.fut
+	rm ols_test.c
+	rm ols_test
 
-test-py: lib ols_test
+test-py: ols_test_pyopencl
 	python validate.py

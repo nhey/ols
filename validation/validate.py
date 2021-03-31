@@ -1,6 +1,6 @@
 import statsmodels.api as sm
 import numpy as np
-from ols_test_opencl import ols_test_opencl
+from ols_test_pyopencl import ols_test_pyopencl
 
 duncan_prestige = sm.datasets.get_rdataset("Duncan", "carData")
 Y = duncan_prestige.data['income']
@@ -13,7 +13,7 @@ X, y = np.array(X, dtype=np.float64).copy(), np.array(Y, dtype=np.float64).copy(
 model = sm.OLS(y,X)
 results = model.fit(method="qr")
 
-ols_fut = ols_test_opencl()
+ols_fut = ols_test_pyopencl()
 
 Q, R = np.linalg.qr(X, mode="complete")
 manual_cov_params = np.linalg.inv(np.dot(R.T, R))
