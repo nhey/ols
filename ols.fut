@@ -24,9 +24,7 @@ module type ols = {
   val ols [m][n] : (block_size: i64) -> (X: [m][n]t) -> (y: [m]t) -> ols_result [n]
 }
 
--- TODO: extend result
 -- TODO: why double transpose in cho_inv, cho_inv2?
--- TODO: get actual rank of R and resize to square matrix, cho_inv, cho_inv2
 module mk_ols (T: real): ols with t = T.t = {
   module linalg = mk_linalg T
   module block_householder = mk_block_householder T
@@ -37,6 +35,7 @@ module mk_ols (T: real): ols with t = T.t = {
   -- need to make it clear that the result does not alias its
   -- input. Otherwise copying must take place during in-place
   -- updates in `forward_substitution` and `back_substitution`.
+  -- With `T` being reals, `T.t` is a scalar so this is safe.
   let dotprod [n] (xs: [n]t) (ys: [n]t): *t =
     T.(reduce (+) (i64 0) (map2 (*) xs ys))
 
@@ -67,12 +66,18 @@ module mk_ols (T: real): ols with t = T.t = {
 
   let ols [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): ols_result [n] =
     let (Q, R) = block_householder.qr bsz X
-    let Q = Q[:m,:n] -- TODO: n should be min(m,n)
-    let R = R[:n,:n] -- TODO: first n should be min(m,n)
+    -- We can discard zero rows/cols in Q and R that when multiplied
+    -- make no difference to the outcome.
+    -- The shared non-zero dimension is `min(m,n)`. However fitting
+    -- a linear regression with `n` parameters requires at least
+    -- `n` datapoints so we always have `m >= n`.
+    let Q = Q[:m,:n]
+    let R = R[:n,:n]
     let cov_params = cho_inv2 (transpose R)
-    -- Solve Xb = y => (QR)b = y => Rb = (Q.T) y since Q.T Q = I.
-    -- The last equation can be solved using back substitution
-    -- since R is upper triangular.
+    -- Solve `Xb = y`. Given `X = QR` and `Q^T Q = I`, we have
+    -- `Xb = y => (QR)b = y => Rb = Q^T y`. This last equation
+    -- can be solved using back substitution since R is upper
+    -- triangular.
     let effects = linalg.matvecmul_row (transpose Q) y
     let beta = back_substitution R effects
     in { params = beta, cov_params = cov_params }
