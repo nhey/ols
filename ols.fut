@@ -57,23 +57,24 @@ module mk_ols (T: real): ols with t = T.t = {
       let x[i] = (y[i] T.- sumx) T./ U[i,i]
       in x
 
-  -- TODO: try replacing with back subst and not transposing R?
-  let cho_inv2 [n] (L: [n][n]t): [n][n]t =
-    let Linv = map (forward_substitution L) (identity n) |> transpose
-    in linalg.matmul (transpose Linv) Linv
+  -- Compute `(U^T U)^{-1} = U^{-1} (U^T)^{-1} = U^{-1} (U^{-1})^T`.
+  -- Should be the same as `cho_inv`, but using the upper triangular
+  -- matrix. If fed `R` from QR decomposition of `X`, result is
+  -- `(X^T X)^{-1}`; thanks to hint given by R function of same name.
+  let chol2inv [n] (U: [n][n]t): [n][n]t =
+    let UinvT = map (back_substitution U) (identity n)
+    in linalg.matmul (transpose UinvT) UinvT
 
   type ols_result [n] = { params: [n]t, cov_params: [n][n]t }
 
   let ols [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): ols_result [n] =
     let (Q, R) = block_householder.qr bsz X
-    -- We can discard zero rows/cols in Q and R that when multiplied
-    -- make no difference to the outcome.
-    -- The shared non-zero dimension is `min(m,n)`. However fitting
-    -- a linear regression with `n` parameters requires at least
-    -- `n` datapoints so we always have `m >= n`.
+    -- The shared dimension is `k = min(m,n)`. However fitting a
+    -- linear regression with `n` parameters requires at least
+    -- `n` datapoints, so we always have `m >= n`; consequently `k = n`.
     let Q = Q[:m,:n]
     let R = R[:n,:n]
-    let cov_params = cho_inv2 (transpose R)
+    let cov_params = chol2inv R
     -- Solve `Xb = y`. Given `X = QR` and `Q^T Q = I`, we have
     -- `Xb = y => (QR)b = y => Rb = Q^T y`. This last equation
     -- can be solved using back substitution since R is upper
