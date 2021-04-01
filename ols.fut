@@ -58,19 +58,19 @@ module mk_ols (T: real): ols with t = T.t = {
       in x
 
   -- Given an upper triangular matrix `U`, compute `(U^T U)^{-1}`.
-  -- If fed transpose of `L` from Cholesky decomposition of a symmetric,
+  -- Also returns the intermediate result `U^{-1}`.
+  -- * If fed transpose of `L` from Cholesky decomposition of a symmetric,
   -- positive definite square matrix `A`, result is `A^{-1}`.
-  -- If fed `R` from QR decomposition of `X`, result is `(X^T X)^{-1}`;
-  -- thanks to hint given by R function of the same name.
-  let chol2inv [n] (U: [n][n]t): [n][n]t =
+  -- * If fed `R` from QR decomposition of `X`, result is `(X^T X)^{-1}`
+  -- since `X^T X = R^T Q^T QR = R^T R`.
+  let chol2inv [n] (U: [n][n]t): ([n][n]t, [n][n]t) =
     let UinvT = map (back_substitution U) (identity n)
+    let Uinv = transpose UinvT
     -- Compute `(U^T U)^{-1} = U^{-1} (U^T)^{-1} = U^{-1} (U^{-1})^T`.
-    in linalg.matmul (transpose UinvT) UinvT
+    in (linalg.matmul Uinv UinvT, Uinv)
 
   type ols_result [n] = { params: [n]t, cov_params: [n][n]t }
 
-  -- TODO: benchmark against version using `R^{-1}` from intermediate
-  -- results of `chol2inv` to solve the final equation for `beta`.
   let ols [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): ols_result [n] =
     let (Q, R) = block_householder.qr bsz X
     -- The shared dimension is `k = min(m,n)`. However fitting a
@@ -78,15 +78,25 @@ module mk_ols (T: real): ols with t = T.t = {
     -- `n` datapoints, so we always have `m >= n`; consequently `k = n`.
     let Q = Q[:m,:n]
     let R = R[:n,:n]
-    let cov_params = chol2inv R
+    let (cov_params, Rinv) = chol2inv R
     -- Find least squares solution to `Xb = y`. Substituting
     -- `X = QR` into the LLS equations `X^T X b = X^T y`, we get
     -- `((QR)^T QR) b = (QR)^T y <=> (R^T Q^T QR) b = R^T Q^T y`.
     -- Now since `Q^T Q = I`, we have `R^T R b = R^T Q^T y`.
     -- Here, we can ignore the `R^T` factor yielding `R b = Q^T y`.
-    -- With `R` being upper triangular, this last equation is
-    -- solved using back substitution.
+    -- With `R` being upper triangular, this last equation may be
+    -- solved using back substitution. But we already have
+    -- `R^{-1}` so premultiplying this is faster.
+    let effects = linalg.matvecmul_row (transpose Q) y
+    let beta = linalg.matvecmul_row Rinv effects
+    in { params = beta, cov_params = cov_params }
+
+  -- TODO: benchmark whether this is ever worth it.
+  let ols_reduced [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): [n]t =
+    let (Q, R) = block_householder.qr bsz X
+    let Q = Q[:m,:n]
+    let R = R[:n,:n]
     let effects = linalg.matvecmul_row (transpose Q) y
     let beta = back_substitution R effects
-    in { params = beta, cov_params = cov_params }
+    in beta
 }
