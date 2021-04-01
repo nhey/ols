@@ -20,11 +20,11 @@ module type ols = {
   -- The linear least squares equations for regression, `X^T X b = X^T y`,
   -- is solved using QR decomposition.
   --
-  -- See [mk_block_householder](https://futhark-lang.org/pkgs/github.com/diku-dk/linalg/0.4.1/) for important details on `block_size`.
+  -- See [mk_block_householder](https://futhark-lang.org/pkgs/github.com/diku-dk/linalg/0.4.1/)
+  -- for important details on `block_size`.
   val ols [m][n] : (block_size: i64) -> (X: [m][n]t) -> (y: [m]t) -> ols_result [n]
 }
 
--- TODO: why double transpose in cho_inv, cho_inv2?
 module mk_ols (T: real): ols with t = T.t = {
   module linalg = mk_linalg T
   module block_householder = mk_block_householder T
@@ -35,7 +35,7 @@ module mk_ols (T: real): ols with t = T.t = {
   -- need to make it clear that the result does not alias its
   -- input. Otherwise copying must take place during in-place
   -- updates in `forward_substitution` and `back_substitution`.
-  -- With `T` being reals, `T.t` is a scalar so this is safe.
+  -- `T.t` is a scalar when `T` is the reals, so this is safe.
   let dotprod [n] (xs: [n]t) (ys: [n]t): *t =
     T.(reduce (+) (i64 0) (map2 (*) xs ys))
 
@@ -57,12 +57,14 @@ module mk_ols (T: real): ols with t = T.t = {
       let x[i] = (y[i] T.- sumx) T./ U[i,i]
       in x
 
-  -- Compute `(U^T U)^{-1} = U^{-1} (U^T)^{-1} = U^{-1} (U^{-1})^T`.
-  -- Should be the same as `cho_inv`, but using the upper triangular
-  -- matrix. If fed `R` from QR decomposition of `X`, result is
-  -- `(X^T X)^{-1}`; thanks to hint given by R function of same name.
+  -- Given an upper triangular matrix `U`, compute `(U^T U)^{-1}`.
+  -- If fed transpose of `L` from Cholesky decomposition of a symmetric,
+  -- positive definite square matrix `A`, result is `A^{-1}`.
+  -- If fed `R` from QR decomposition of `X`, result is `(X^T X)^{-1}`;
+  -- thanks to hint given by R function of the same name.
   let chol2inv [n] (U: [n][n]t): [n][n]t =
     let UinvT = map (back_substitution U) (identity n)
+    -- Compute `(U^T U)^{-1} = U^{-1} (U^T)^{-1} = U^{-1} (U^{-1})^T`.
     in linalg.matmul (transpose UinvT) UinvT
 
   type ols_result [n] = { params: [n]t, cov_params: [n][n]t }
