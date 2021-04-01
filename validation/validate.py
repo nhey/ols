@@ -20,12 +20,13 @@ manual_cov_params = np.linalg.inv(np.dot(R.T, R))
 
 ocl_params, ocl_cov_params = ols_fut.fit(1, X, y)
 
+print("Validating statsmodels example")
 print("\n Covariance of parameters")
 print("manual:", manual_cov_params)
 print("sm.OLS:", results.normalized_cov_params)
 print("opencl:", ocl_cov_params.get())
 
-print("\n Parameters")
+print(" Parameters")
 print("sm.OLS:", results.params)
 print("opencl:", ocl_params)
 
@@ -51,8 +52,8 @@ def validate(num_tests, bsz):
       break
   return ok
 
-runs = 100
-print("Validating {} random runs block size 1...".format(runs))
+runs = 1000
+print("\nValidating {} random runs block size 1...".format(runs))
 print(validate(runs, 1))
 print("Validating {} random runs block size 2...".format(runs))
 print(validate(runs, 2))
