@@ -9,14 +9,14 @@ let
     src = (fetchTarball "https://github.com/diku-dk/futhark/archive/${futhark-version}.tar.gz");
     patches = [ ./futhark.patch ];
   };
-  futhark-git = pkgs.haskellPackages.callPackage futhark-src { suffix = "nightly"; };
+  futhark-pinned = pkgs.haskellPackages.callPackage futhark-src { suffix = "nightly"; };
 in
 pkgs.stdenv.mkDerivation {
   name = "shell";
     buildInputs = with pkgs; [
     opencl-headers
     ocl-icd
-    futhark-git
+    futhark-pinned
     gcc
     (python38.withPackages (pypkgs: with pypkgs; [
       numpy
