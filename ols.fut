@@ -69,6 +69,8 @@ module mk_ols (T: real): ols with t = T.t = {
 
   type ols_result [n] = { params: [n]t, cov_params: [n][n]t }
 
+  -- TODO: benchmark against version using `R^{-1}` from intermediate
+  -- results of `chol2inv` to solve the final equation for `beta`.
   let ols [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): ols_result [n] =
     let (Q, R) = block_householder.qr bsz X
     -- The shared dimension is `k = min(m,n)`. However fitting a
@@ -77,10 +79,13 @@ module mk_ols (T: real): ols with t = T.t = {
     let Q = Q[:m,:n]
     let R = R[:n,:n]
     let cov_params = chol2inv R
-    -- Solve `Xb = y`. Given `X = QR` and `Q^T Q = I`, we have
-    -- `Xb = y => (QR)b = y => Rb = Q^T y`. This last equation
-    -- can be solved using back substitution since R is upper
-    -- triangular.
+    -- Find least squares solution to `Xb = y`. Substituting
+    -- `X = QR` into the LLS equations `X^T X b = X^T y`, we get
+    -- `((QR)^T QR) b = (QR)^T y <=> (R^T Q^T QR) b = R^T Q^T y`.
+    -- Now since `Q^T Q = I`, we have `R^T R b = R^T Q^T y`.
+    -- Here, we can ignore the `R^T` factor yielding `R b = Q^T y`.
+    -- With `R` being upper triangular, this last equation is
+    -- solved using back substitution.
     let effects = linalg.matvecmul_row (transpose Q) y
     let beta = back_substitution R effects
     in { params = beta, cov_params = cov_params }
