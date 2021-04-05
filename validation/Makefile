@@ -1,4 +1,4 @@
-# May want to run `make lib` in ../.
+# May want to run `futhark pkg sync` in ../.
 clean:
 	rm -f *.out *.out.c *_pyopencl.py
 	rm -rf __pycache__

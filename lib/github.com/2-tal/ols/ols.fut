@@ -6,10 +6,6 @@
 -- internal functions have been copied from [their
 -- report](https://futhark-lang.org/student-projects/kristian-kasper-peter-project.pdf).
 
-import "lib/github.com/diku-dk/linalg/linalg"
-import "lib/github.com/diku-dk/linalg/qr"
-
-
 module type ols = {
   type t
   -- | `params` are the estimated coefficients (β) and
@@ -26,6 +22,9 @@ module type ols = {
 }
 
 module mk_ols (T: real): ols with t = T.t = {
+  import "../../diku-dk/linalg/linalg"
+  import "../../diku-dk/linalg/qr"
+
   module linalg = mk_linalg T
   module block_householder = mk_block_householder T
 

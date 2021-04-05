@@ -1,4 +1,4 @@
-package github.com/tvk568/ols
+package github.com/2-tal/ols
 
 require {
   github.com/diku-dk/linalg 0.0.0-20200322104634+9acee2561fc40e78eb7ecb504902d5d5cad3f3ee
