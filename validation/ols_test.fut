@@ -1,4 +1,4 @@
-import "../ols"
+import "../lib/github.com/2-tal/ols/ols"
 
 module ols = mk_ols f64
 
@@ -31,5 +31,5 @@ module ols = mk_ols f64
 --             [9.30974511e-02f64, -1.34857729e-03f64],
 --             [-1.34857729e-03f64, 2.56600331e-05f64]] }
 entry fit [m][n] (bsz: i64) (X: [m][n]f64) (y: [m]f64) =
-  let res = ols.ols bsz X y
+  let res = ols.fit bsz X y
   in (res.params, res.cov_params)

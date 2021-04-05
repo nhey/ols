@@ -14,7 +14,7 @@ module type ols = {
   type t
   -- | `params` are the estimated coefficients (β) and
   -- `cov_params` is the covariance matrix `(X^T X)^{-1}`
-  type ols_result [n] = { params: [n]t, cov_params: [n][n]t }
+  type results [n] = { params: [n]t, cov_params: [n][n]t }
   -- | Ordinary Least Squares (OLS) for estimating parameters
   -- in a linear regression model.
   -- The linear least squares equations for regression, `X^T X b = X^T y`,
@@ -22,7 +22,7 @@ module type ols = {
   --
   -- See [mk_block_householder](https://futhark-lang.org/pkgs/github.com/diku-dk/linalg/0.4.1/)
   -- for important details on `block_size`.
-  val ols [m][n] : (block_size: i64) -> (X: [m][n]t) -> (y: [m]t) -> ols_result [n]
+  val fit [m][n] : (block_size: i64) -> (X: [m][n]t) -> (y: [m]t) -> results [n]
 }
 
 module mk_ols (T: real): ols with t = T.t = {
@@ -69,9 +69,9 @@ module mk_ols (T: real): ols with t = T.t = {
     -- Compute `(U^T U)^{-1} = U^{-1} (U^T)^{-1} = U^{-1} (U^{-1})^T`.
     in (linalg.matmul Uinv UinvT, Uinv)
 
-  type ols_result [n] = { params: [n]t, cov_params: [n][n]t }
+  type results [n] = { params: [n]t, cov_params: [n][n]t }
 
-  let ols [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): ols_result [n] =
+  let fit [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): results [n] =
     let (Q, R) = block_householder.qr bsz X
     -- The shared dimension is `k = min(m,n)`. However fitting a
     -- linear regression with `n` parameters requires at least
@@ -92,7 +92,7 @@ module mk_ols (T: real): ols with t = T.t = {
     in { params = beta, cov_params = cov_params }
 
   -- TODO: benchmark whether this is ever worth it.
-  let ols_reduced [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): [n]t =
+  let fit_reduced [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): [n]t =
     let (Q, R) = block_householder.qr bsz X
     let Q = Q[:m,:n]
     let R = R[:n,:n]
