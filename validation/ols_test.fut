@@ -1,4 +1,4 @@
-import "../lib/github.com/2-tal/ols/ols"
+import "../lib/github.com/nhey/ols/ols"
 
 module ols = mk_ols f64
 
