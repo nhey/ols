@@ -38,9 +38,11 @@ module mk_ols (T: real): ols with t = T.t = {
   let dotprod [n] (xs: [n]t) (ys: [n]t): *t =
     T.(reduce (+) (i64 0) (map2 (*) xs ys))
 
+  -- Copied from report on linear algebra in Futhark.
   let identity (n: i64): [n][n]t =
     tabulate_2d n n (\i j ->if j == i then T.i64 1 else T.i64 0)
 
+  -- Copied from report on linear algebra in Futhark.
   let forward_substitution [n] (L: [n][n]t) (b: [n]t): [n]t =
     let y = replicate n (T.i64 0)
     in loop y for i in 0..<n do
@@ -48,6 +50,7 @@ module mk_ols (T: real): ols with t = T.t = {
       let y[i] = (b[i] T.- sumy) T./ L[i,i]
       in y
 
+  -- Copied from report on linear algebra in Futhark.
   let back_substitution [n] (U: [n][n]t) (y: [n]t): [n]t =
     let x = replicate n (T.i64 0)
     in loop x for j in 0..<n do
@@ -62,6 +65,7 @@ module mk_ols (T: real): ols with t = T.t = {
   -- positive definite square matrix `A`, result is `A^{-1}`.
   -- * If fed `R` from QR decomposition of `X`, result is `(X^T X)^{-1}`
   -- since `X^T X = R^T Q^T QR = R^T R`.
+  -- The name is an homage to similar functionality in the R language.
   let chol2inv [n] (U: [n][n]t): ([n][n]t, [n][n]t) =
     let UinvT = map (back_substitution U) (identity n)
     let Uinv = transpose UinvT
