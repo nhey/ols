@@ -8,9 +8,15 @@
 
 module type ols = {
   type t
-  -- | `params` are the estimated coefficients (β) and
-  -- `cov_params` is the covariance matrix `(X^T X)^{-1}`
-  type results [n] = { params: [n]t, cov_params: [n][n]t }
+  -- | `params` are the estimated coefficients (β),
+  -- `cov_params` is the covariance matrix `(X^T X)^{-1}` and
+  -- `rank` denotes the rank of the regressor matrix `X`.
+  -- If `rank` is less than the number of parameters in `X`,
+  -- the OLS estimator does not exist and the output should
+  -- not be treated as OLS results. If you run into this,
+  -- a suggestion is to drop the offending parameters from `X`.
+  -- See [multicolinearity](https://en.wikipedia.org/wiki/Multicollinearity).
+  type results [n] = { params: [n]t, cov_params: [n][n]t, rank: i64 }
   -- | Ordinary Least Squares (OLS) for estimating parameters
   -- in a linear regression model.
   -- The linear least squares equations for regression, `X^T X b = X^T y`,
@@ -21,7 +27,7 @@ module type ols = {
   val fit [m][n] : (block_size: i64) -> (X: [m][n]t) -> (y: [m]t) -> results [n]
 }
 
-module mk_ols (T: real): ols with t = T.t = {
+module mk_ols (T: float): ols with t = T.t = {
   import "../../diku-dk/linalg/linalg"
   import "../../diku-dk/linalg/qr"
 
@@ -72,10 +78,24 @@ module mk_ols (T: real): ols with t = T.t = {
     -- Compute `(U^T U)^{-1} = U^{-1} (U^T)^{-1} = U^{-1} (U^{-1})^T`.
     in (linalg.matmul Uinv UinvT, Uinv)
 
-  type results [n] = { params: [n]t, cov_params: [n][n]t }
+  -- Compute rank of `X` as number of non-zero elements in the
+  -- leading diagonal of `R` from QR decomposition of `X`.
+  -- Where non-zeros are greater than `t.abs R[0,0] * n * t.epsilon`.
+  --
+  -- NOTE: This is not entirely correct; it would require a
+  -- "rank-revealing" QR factorisation. Which is not available,
+  -- so this will have to suffice. It does however validate when
+  -- using a large epsilon value.
+  let matrix_rank [m][n] (R: [m][n]t): i64 =
+    -- TODO tol is 1e3 too large
+    let tol = T.(abs R[0,0] * i64 n * epsilon * f32 1e4)
+    in map (\i -> i64.bool T.(abs R[i,i] > tol)) (iota n) |> i64.sum
+
+  type results [n] = { params: [n]t, cov_params: [n][n]t, rank: i64 }
 
   let fit [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): results [n] =
     let (Q, R) = block_householder.qr bsz X
+    let rank = matrix_rank R
     -- The shared dimension is `k = min(m,n)`. However fitting a
     -- linear regression with `n` parameters requires at least
     -- `n` datapoints, so we always have `m >= n`; consequently `k = n`.
@@ -92,14 +112,15 @@ module mk_ols (T: real): ols with t = T.t = {
     -- `R^{-1}` so premultiplying this is faster.
     let effects = linalg.matvecmul_row (transpose Q) y
     let beta = linalg.matvecmul_row Rinv effects
-    in { params = beta, cov_params = cov_params }
+    in { params = beta, cov_params = cov_params, rank = rank }
 
   -- TODO: benchmark whether this is ever worth it.
-  let fit_reduced [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): [n]t =
+  let fit_reduced [m][n] (bsz: i64) (X: [m][n]t) (y: [m]t): ([n]t, i64) =
     let (Q, R) = block_householder.qr bsz X
+    let rank = matrix_rank R
     let Q = Q[:m,:n]
     let R = R[:n,:n]
     let effects = linalg.matvecmul_row (transpose Q) y
     let beta = back_substitution R effects
-    in beta
+    in (beta, rank)
 }
